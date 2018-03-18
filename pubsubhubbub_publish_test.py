@@ -19,21 +19,28 @@
 
 __author__ = 'bslatkin@gmail.com (Brett Slatkin)'
 
-import BaseHTTPServer
-import urllib
 import unittest
 import threading
+import codecs
+# making compatatible variables between py2 and py3.
+try:
+    from urllib import urlencode
+except ImportError:
+    from urllib.parse import urlencode
+try:
+    from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
+except ImportError:
+    from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import pubsubhubbub_publish
-
 
 REQUESTS = 0
 
 
-class RequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
+class RequestHandler(BaseHTTPRequestHandler):
   def do_POST(self):
     global REQUESTS
-    print 'Accessed', self.path
+    print('Accessed', self.path)
     REQUESTS += 1
 
     length = int(self.headers.get('content-length', 0))
@@ -42,26 +49,29 @@ class RequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     body = self.rfile.read(length)
 
     if self.path == '/single':
-      if body != urllib.urlencode(
-          {'hub.url': 'http://example.com/feed', 'hub.mode': 'publish'}):
+      if body != codecs.encode(urlencode(
+          {'hub.url': 'http://example.com/feed', 'hub.mode': 'publish'})):
         self.send_error(500)
         self.wfile.write('Bad body. Found:')
         self.wfile.write(body)
       else:
         self.send_response(204)
+        self.end_headers()
     elif self.path == '/multiple':
-      if body != urllib.urlencode(
+      if body != codecs.encode(urlencode(
           {'hub.url': ['http://example.com/feed',
                        'http://example.com/feed2',
                        'http://example.com/feed3'],
-           'hub.mode': 'publish'}, doseq=True):
+           'hub.mode': 'publish'}, doseq=True)):
         self.send_error(500)
         self.wfile.write('Bad body. Found:')
         self.wfile.write(body)
       else:
         self.send_response(204)
+        self.end_headers()
     elif self.path == '/batch':
       self.send_response(204)
+      self.end_headers()
     elif self.path == '/fail':
       self.send_error(400)
       self.wfile.write('bad argument')
@@ -74,7 +84,7 @@ class PublishTest(unittest.TestCase):
   def setUp(self):
     global REQUESTS
     REQUESTS = 0
-    self.server = BaseHTTPServer.HTTPServer(('', 0), RequestHandler)
+    self.server = HTTPServer(('', 0), RequestHandler)
     t = threading.Thread(target=self.server.serve_forever)
     t.setDaemon(True)
     t.start()

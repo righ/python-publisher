@@ -34,8 +34,24 @@ HTTP proxy.
 
 __author__ = 'bslatkin@gmail.com (Brett Slatkin)'
 
-import urllib
-import urllib2
+import codecs
+# making compatatible variables between py2 and py3.
+try:
+    from urllib import urlencode
+except ImportError:
+    from urllib.parse import urlencode
+try:
+    from urllib2 import urlopen, HTTPError
+except ImportError:
+    from urllib.request import urlopen, HTTPError
+try:
+    basestring
+except NameError:
+    basestring = (str,)
+try:
+    xrange
+except NameError:
+    xrange = range
 
 
 class PublishError(Exception):
@@ -64,13 +80,11 @@ def publish(hub, *urls):
 
   for i in xrange(0, len(urls), URL_BATCH_SIZE):
     chunk = urls[i:i+URL_BATCH_SIZE]
-    data = urllib.urlencode(
+    data = urlencode(
         {'hub.url': chunk, 'hub.mode': 'publish'}, doseq=True)
     try:
-      response = urllib2.urlopen(hub, data)
-    except (IOError, urllib2.HTTPError), e:
-      if hasattr(e, 'code') and e.code == 204:
-        continue
+      response = urlopen(hub, codecs.encode(data))
+    except (IOError, HTTPError) as e:
       error = ''
       if hasattr(e, 'read'):
         error = e.read()
